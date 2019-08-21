@@ -1,0 +1,26 @@
+;
+; Lightsensor
+;
+; Compiled 16 bytes
+
+CONST  LIGHT_SENSOR_PORT    1
+CONST  SWITCH_PORT  3
+CONST  LIGHT_LEVEL  12
+
+IN LIGHT_SENSOR_PORT
+SUB LIGHT_LEVEL
+JMPLT device_on         ;Light bellow the level
+
+;Switch device OFF
+PUSHI 0
+JMP return
+
+:device_on
+;Switch device ON
+PUSHI 1
+
+:return
+OUT SWITCH_PORT
+IN SWITCH_PORT
+RETURN
+

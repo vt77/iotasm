@@ -1,0 +1,75 @@
+#!/usr/bin/python3
+
+import os,sys
+import logging
+import traceback
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+lh = logging.StreamHandler(sys.stdout)
+lh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+lh.setFormatter(formatter)
+logger.addHandler(lh)
+
+from argparse import ArgumentParser
+from lib.compiler import compile
+from lib.compiler import CompileException
+from lib.stackmachine import run
+
+parser = ArgumentParser()
+parser.add_argument("-f", "--file", dest="logfile",
+                    help="write report to FILE", metavar="FILE")
+parser.add_argument("-q", "--quiet",
+                    action="store_false", dest="verbose", default=False,
+                    help="don't print status messages to stdout")
+
+parser.add_argument(
+                'script', metavar='script',
+                nargs='+', help='script filename')
+
+args = parser.parse_args()
+script_filename = args.script[0]
+logger.debug("Loading script %s",script_filename)
+
+
+''' Fake device . In real unit tests complex logic may be applied '''
+
+ports = {
+    '1': -1, #Temperature 
+    '2': 30, #Regulator
+    '3': 1   #Switch
+}
+
+class FakePLCDevice:
+    def port_in(self,port):
+        value = ports[str(port)]
+        logger.debug("[DEVICE]Read port %s . Return %s"  % (port,value))
+        return value
+
+    def port_out(self,port,value):
+        logger.debug("[DEVICE]Write port %s value %s"  % (port,value))
+        if port == 3:
+            logger.debug("[DEVICE]Port %s changed to value %s"  % (port,value))
+            ports["3"] = value
+
+device = FakePLCDevice()
+
+if script_filename.endswith('.iot.src'):
+    try:
+        compiled_ = compile(script_filename)
+    except CompileException as e:
+        print("Compliler error: Error  in line %s : %s" % (e.line,e.error))
+        sys.exit(-1)
+
+    script_filename = script_filename[:-4]
+    with open(script_filename,"wb") as f:
+        f.write(compiled_)      
+else:
+    with open(script_filename,"rb") as f:
+        compiled_ = f.read()
+
+result = run(compiled_,[34])
+print("Script complete result : %s" % result)
+

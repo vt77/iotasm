@@ -1,0 +1,17 @@
+;
+; Simple loop test
+;
+
+PUSHI 5
+DUP
+STOR retval
+
+:next
+SUBI 1
+DUP                         ;Because conditional jump removes last value from stack
+JMPGT next
+
+LOAD retval
+;Return value should be 5
+RETURN
+

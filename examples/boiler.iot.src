@@ -1,0 +1,45 @@
+
+;
+; Water boiler temperature regulator
+; Reads potentiometer for temperature level
+; Temperature and regulator potentiometer should have same scale (usually percents 0-100)
+; 
+; Compiled size 30 bytes
+;
+
+CONST  HYSTERESIS   5
+
+CONST  TEMPERATURE_PORT    1
+CONST  REGULATOR_PORT      2
+CONST  SWITCH_PORT         3
+CONST  MAX_VALUE           90
+
+
+IN TEMPERATURE_PORT     ;Read current temperature
+DUP                     ;Save copy for later use
+CMPI MAX_VALUE          ;if stack[0] > MAX_VALUE
+JMPGT device_off        ;Emergency OFF
+
+;Calculate difference 
+IN REGULATOR_PORT       ;Read set value 
+SUB                     ;Temperature - set value
+
+ADDI HYSTERESIS         ;Add Hysteresis
+DUP
+
+JMPLT device_on         
+JMPEQ ret_switch_status ; Do nothing because heater is inertial
+
+:device_off
+PUSHI 0
+OUT SWITCH_PORT         ;Switch heater off
+JMP ret_switch_status
+
+:device_on
+PUSHI 1
+OUT SWITCH_PORT
+
+:ret_switch_status
+IN SWITCH_PORT  ;Return actual switch status
+RETURN
+

@@ -1,0 +1,46 @@
+;
+; Timer 
+; Runs both on timer start button and on timer event(seconds)
+;
+; Compiled 33 bytes
+
+CONST  BUTTON_PORT    1
+CONST  SWITCH_PORT    3
+
+;Timer delay in periods
+CONST  DELAY_UNITS     15 
+
+;Timer value on start
+LET timer_value 0      
+
+LOAD timer_value 
+IN  BUTTON_PORT
+JMPEQ timer_proc         ;Button not pressed
+
+ADD DELAY_UNITS
+DUP
+STOR timer_value   
+
+PUSHI 1
+OUT SWITCH_PORT         ;Switch Load ON
+
+:timer_proc
+DUP
+JMPEQ timer_complete
+
+SUBI 1
+STOR timer_value
+
+:timer_complete
+IN SWITCH_PORT
+JMPEQ return                ;Do nothing if Load off
+
+;Switch device OFF
+PUSHI 0
+OUT SWITCH_PORT
+
+:return
+IN SWITCH_PORT
+RETURN
+
+
