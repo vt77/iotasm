@@ -12,7 +12,10 @@ License: MIT
 import logging
 logger = logging.getLogger(__name__)
 
+import math
+
 from .stackmachine import commands
+
 
 class CompileException(Exception):
     def __init__(self,line,message):
@@ -24,7 +27,7 @@ class CompileException(Exception):
 class LinkException(Exception):
     pass
 
-def compile(script_filename):
+def compile(script_filename,registersize=8):
     """ Compile to bytecode. Input : filename (iot.src) Retruns bytes() """
     with open(script_filename,"rt") as f:
         lines_count = 0
@@ -35,7 +38,12 @@ def compile(script_filename):
         vars_init = {}
         constants = {}
 
-        logger.info("Compile script %s ",script_filename)
+        if registersize not in [8,16,32,64]:
+            raise CompileException(("Wrong register size %d. Should be one of [8,16,32,64]" % registersize))
+
+        MAX_NUMBER = int(math.pow(2,registersize))
+
+        logger.info("Compile script %s for arch %s bits MAX_NUMBER(%s)",script_filename,registersize*8,MAX_NUMBER)
 
         for line in f.read().splitlines():
             lines_count += 1
@@ -53,7 +61,10 @@ def compile(script_filename):
                 ''' Preprocessor for vars_init'''
                 (_,var_name,value) = line.split()
                 logger.debug("Found variable %s" , var_name )
-                vars_init[var_name]=int(value)
+                value = int(value)
+                if value > MAX_NUMBER:
+                    raise LinkException("Number %s to big for architecture %s bit" % (value,registersize*8))
+                vars_init[var_name]=value
                 vars.append(str(var_name))
                 continue
 
@@ -82,6 +93,10 @@ def compile(script_filename):
                             param = str(command[1])
                          else:
                             CompileException(lines_count,"Wrong constant value : %s" % (command[1]))
+
+                         if int(param) > MAX_NUMBER:
+                            raise LinkException("Number %s to big for architecture %s bit" % (param,registersize*8))
+
                     elif cmd_data[2] == 'A': #variable (address in dataspace)
                         param = 'var:%s' % command[1]
                     elif cmd_data[2] == 'L': #Label
@@ -121,6 +136,6 @@ def compile(script_filename):
              compiled_data.append(vars_init.get(var_name,0))
        
         logger.info("Compile script done: Code %d byte(s). Data %d byte(s)",data_segment_start,len(vars))
-        return bytes(compiled_data)
+        return compiled_data
 
     return None

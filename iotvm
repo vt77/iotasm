@@ -17,6 +17,9 @@ from argparse import ArgumentParser
 from lib.compiler import compile
 from lib.compiler import CompileException
 from lib.stackmachine import run
+from lib.loader import scriptformat
+from lib.loader import load_script_file,save_script_file
+
 
 parser = ArgumentParser()
 parser.add_argument("-f", "--file", dest="logfile",
@@ -24,6 +27,7 @@ parser.add_argument("-f", "--file", dest="logfile",
 parser.add_argument("-q", "--quiet",
                     action="store_false", dest="verbose", default=False,
                     help="don't print status messages to stdout")
+parser.add_argument("-t","--format",default='b8',dest="format",help="Byte size b8, b16 or b32",choices=['b8','b16','b32'])
 
 parser.add_argument(
                 'script', metavar='script',
@@ -31,8 +35,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 script_filename = args.script[0]
-logger.debug("Loading script %s",script_filename)
-
+logger.debug("Processing script %s",script_filename)
+format = args.format
 
 ''' Fake device . In real unit tests complex logic may be applied '''
 
@@ -58,18 +62,15 @@ device = FakePLCDevice()
 
 if script_filename.endswith('.iot.src'):
     try:
-        compiled_ = compile(script_filename)
+        compiled_ = compile(script_filename,registersize=getattr(scriptformat,format).get_byte_size()*8)
     except CompileException as e:
         print("Compliler error: Error  in line %s : %s" % (e.line,e.error))
         sys.exit(-1)
 
     script_filename = script_filename[:-4]
-    with open(script_filename,"wb") as f:
-        f.write(compiled_)      
-else:
-    with open(script_filename,"rb") as f:
-        compiled_ = f.read()
+    save_script_file(script_filename,compiled_,format=getattr(scriptformat,format))
 
-result = run(compiled_,[34])
+bytecode = load_script_file(script_filename) 
+result = run(bytecode,[34])
 print("Script complete result : %s" % result)
 

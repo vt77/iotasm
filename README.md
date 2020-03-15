@@ -114,7 +114,9 @@ RETURN
  ## Examples
  See *examples* directory 
  
- 
+## Changelog
+
+* 13.03.2020 Byte size added. Now it works on 8,16 or 32 bit CPU architecture 
 
 ## License
 MIT License. See License.txt for more info

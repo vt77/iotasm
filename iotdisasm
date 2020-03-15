@@ -1,0 +1,111 @@
+#!/usr/bin/python3
+
+__VERSION__ = "1.0.0"
+
+import os,sys
+import logging
+import traceback
+
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+lh = logging.StreamHandler(sys.stderr)
+lh.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+lh.setFormatter(formatter)
+logger.addHandler(lh)
+
+from argparse import ArgumentParser
+from lib.compiler import compile
+from lib.compiler import CompileException
+from lib.stackmachine import commands
+from lib.loader import load_script_file 
+
+parser = ArgumentParser()
+parser.add_argument("-f", "--file", dest="logfile",
+                    help="write report to FILE", metavar="FILE")
+parser.add_argument("-q", "--quiet",
+                    action="store_true", dest="verbose", default=False,
+                    help="don't print status messages to stdout")
+parser.add_argument("-l", "--linenum",
+                    action="store_true", dest="linenum", default=False,
+                    help="Print line numbers")
+
+parser.add_argument(
+                'script', metavar='script',
+                nargs='+', help='script filename')
+
+args = parser.parse_args()
+script_filename = args.script[0]
+logger.debug("Process script %s",script_filename)
+linenumbers = args.linenum
+
+datasegment_start = 0xffffffff
+
+def iterate_script(bytecode):
+    for i in range(0,len(bytecode)):
+        if i < datasegment_start:
+            yield bytecode[i]       
+    return None
+
+data = {}
+code  = {}
+labels = {}
+
+def print_diasm():
+    
+    #print(data);
+    #print(code);
+    #print(labels);
+
+    label_lines = { L:n for n,L in labels.items()} 
+
+    print("\n;IOTASM script decompiler ver ",__VERSION__)
+    print(";More info https://github.com/vt77/iotasm")
+    
+    print("\n\n;---- Variables  ----\n")
+    for label,value in data.items():
+       print("LET %s %d" % (label,value))    
+    
+    print("\n;---- Code segment ----\n")
+    for line_num in sorted(code.keys()):
+       cmd = code[line_num]
+       if line_num in label_lines.keys():
+             print("\n:%s"%label_lines[line_num])
+       print ((str(line_num) + ' ' if linenumbers else '') + ' '.join([str(s) for s in cmd]))
+
+command_params = {}
+for name,params in commands.items(): 
+   command_params[params[0]] = {'name':name,'ptype': params[2] if params[1] == 1 else None }
+
+if script_filename.endswith('.iot'):
+    bytecode = load_script_file(script_filename)
+    script = iterate_script(bytecode)
+    line_num = 0
+    while True:
+        try: 
+            cmd = command_params[next(script)]
+            cmd_data = [cmd['name']]
+            cmd_size = 1;
+            if cmd['ptype'] is not None:
+                param =  next(script)
+                if cmd['ptype'] == 'C':
+                    cmd_data.append(param)
+                elif cmd['ptype'] == 'L':
+                   label_name = 'LABEL_%s'%param
+                   labels['LABEL_%s'%param] = param
+                   cmd_data.append(label_name) 
+                elif cmd['ptype'] == 'A':
+                    var_name = 'VAR_%s'%param
+                    if var_name not in data:
+                         data['VAR_%s'%param] = bytecode[param]
+                    cmd_data.append(var_name)
+                cmd_size = 2;
+            code[line_num] = cmd_data
+            line_num = line_num + cmd_size
+        except StopIteration:
+            break
+    print_diasm()
+else:
+   print("Wrong file extension")
+
